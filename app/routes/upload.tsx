@@ -5,7 +5,7 @@ import {usePuterStore} from "~/lib/puter";
 import {useNavigate} from "react-router";
 import {convertPdfToImage} from "~/lib/pdf2img";
 import {generateUUID} from "~/lib/utils";
-import {prepareInstructions} from "../../constants";
+import {prepareInstructions, AIResponseFormat} from "../../constants";
 
 const Upload = () => {
     const { auth, isLoading, fs, ai, kv } = usePuterStore();
@@ -48,18 +48,30 @@ const Upload = () => {
 
         const feedback = await ai.feedback(
             uploadedFile.path,
-            prepareInstructions({ jobTitle, jobDescription,AIResponseFormat:"text" })
+            prepareInstructions({ jobTitle, jobDescription, AIResponseFormat })
         )
         if (!feedback) return setStatusText('Error: Failed to analyze resume');
 
+        console.log('Raw AI Response:', feedback);
+        
         const feedbackText = typeof feedback.message.content === 'string'
             ? feedback.message.content
             : feedback.message.content[0].text;
 
-        data.feedback = await JSON.parse(feedbackText);
+        console.log('Feedback Text before parsing:', feedbackText);
+
+        try {
+            data.feedback = await JSON.parse(feedbackText);
+            console.log('Successfully parsed feedback:', data.feedback);
+        } catch (error) {
+            console.error('JSON parsing failed:', error);
+            console.log('Raw text that failed to parse:', feedbackText);
+            return setStatusText('Error: Invalid AI response format');
+        }
         await kv.set(`resume:${uuid}`, JSON.stringify(data));
         setStatusText('Analysis complete, redirecting...');
         console.log(data);
+        navigate(`/resume/${uuid}`);
 
     }
 
